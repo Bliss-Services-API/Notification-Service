@@ -1,0 +1,28 @@
+{
+  "name": "notification-service",
+  "version": "1.0.0",
+  "description": "NodeJS Service for Creating and Sending Notification to the Clients and Celebs",
+  "main": "notification.js",
+  "scripts": {
+    "start": "node notification.js",
+    "dev-start": "nodemon notification.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Sarthak Joshi",
+  "license": "ISC",
+  "dependencies": {
+    "aws-sdk": "^2.792.0",
+    "body-parser": "^1.19.0",
+    "chalk": "^4.1.0",
+    "dotenv": "^8.2.0",
+    "express": "^4.17.1",
+    "firebase-admin": "^9.4.1",
+    "pg": "^8.5.1",
+    "pg-hstore": "^2.3.3",
+    "sequelize": "^6.3.5",
+    "sequelize-cli": "^6.2.0"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.6"
+  }
+}
