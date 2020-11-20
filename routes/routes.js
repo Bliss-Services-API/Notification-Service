@@ -9,6 +9,7 @@ module.exports = (postgresClient, firebaseAdminClient, dynamoDBClient, S3Client)
     const Controller = controller(postgresClient, firebaseAdminClient, dynamoDBClient, S3Client);
 
     const pushNotificationController = Controller.pushNotificationController;
+    const syncUpdateController = Controller.syncUpdateController;
 
     router.get('/ping', (req, res) => {
         res.send('OK');
@@ -19,15 +20,16 @@ module.exports = (postgresClient, firebaseAdminClient, dynamoDBClient, S3Client)
         try {
             const message = JSON.parse(req.body.Message);
 
-            const blissRequestId = message.BlissId;
-            const blissRequestResponder = message.blissResponder;
+            const blissRequestId = message.BLISS_REQUEST_ID;
+            const celebName = message.CELEB_NAME;
+            const clientName = message.CLIENT_NAME;
 
             //Send Push Notification
-            const celebFCMToken = await pushNotificationController.getCelebFCMRegistrationToken(blissRequestResponder);
-            await pushNotificationController.pushBlissRequestNotification(celebFCMToken, blissRequestId);
+            const celebFCMToken = await pushNotificationController.getCelebFCMRegistrationToken(celebName);
+            await pushNotificationController.pushBlissRequestNotification(celebFCMToken, blissRequestId, clientName);
 
             //Upload Message in S3
-
+            await syncUpdateController.updateCelebSync(celebName, messageHandledOnClient, blissRequestId);
         }
         catch(err) {
             const error = {
@@ -47,14 +49,17 @@ module.exports = (postgresClient, firebaseAdminClient, dynamoDBClient, S3Client)
         try {
             const message = JSON.parse(req.body.Message);
 
-            const blissResponseId = message.BLISS_ID;
-            const blissResponseRequester = message.BLISS_REQUESTER;
-
-            //Upload Message in S3
+            const blissResponseId = message.BLISS_RESPONSE_ID;
+            const clientId = message.CLIENT_ID;
+            const celebName = message.CELEB_NAME;
+            const blissRequestDate = message.BLISS_REQUEST_DATE;
+            const blissRequestTime = message.BLISS_REQUEST_TIME;
 
             //Send Push Notification
-            const clientFCMToken = await pushNotificationController.getClientFCMRegistrationToken(blissResponseRequester);
-            const messageId = await pushNotificationController.pushBlissResponseNotification(celebFCMToken, blissResponseId);
+            const clientFCMToken = await pushNotificationController.getClientFCMRegistrationToken(clientId);
+            const messageHandledOnClient = await pushNotificationController.pushBlissResponseNotification(clientFCMToken, blissResponseId, celebName, blissRequestDate, blissRequestTime);
+            
+            await syncUpdateController.updateClientSync(clientId, messageHandledOnClient, blissResponseId);
         }
         catch(err) {
             const error = {
@@ -97,6 +102,35 @@ module.exports = (postgresClient, firebaseAdminClient, dynamoDBClient, S3Client)
         }
     })
 
+    router.post('/bliss/request/cancel', async (req, res) => {
+        try {
+            const message = JSON.parse(req.body.Message);
+
+            const blissResponseId = message.BLISS_RESPONSE_ID;
+            const clientId = message.CLIENT_ID;
+            const celebName = message.CELEB_NAME;
+            const blissRequestDate = message.BLISS_REQUEST_DATE;
+            const blissRequestTime = message.BLISS_REQUEST_TIME;
+
+            //Send Push Notification
+            const clientFCMToken = await pushNotificationController.getClientFCMRegistrationToken(clientId);
+            const messageHandledOnClient = await pushNotificationController.pushBlissResponseNotification(clientFCMToken, celebName, blissRequestDate, blissRequestTime);
+            
+            await syncUpdateController.updateClientSync(clientId, messageHandledOnClient, blissResponseId);
+        }
+        catch(err) {
+            const error = {
+                ERR: err.message,
+                RESPONSE: 'Sending Push Notification Failed',
+                CODE: 'PUSH_NOTIFICATION_FAILED'
+            };
+
+            console.error(chalk.error(`ERR: ${JSON.stringify(error)}`));
+        }
+        finally {
+            res.send('OK');
+        }
+    });
 
     return router;
 }

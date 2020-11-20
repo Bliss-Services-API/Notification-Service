@@ -10,28 +10,36 @@ module.exports = (postgresClient, firebaseAdminClient, dynamoDBClient) => {
     const celebFCMRegistrationTokenTable = process.env.CELEB_FCM_REGISTRATION_TOKEN_TABLE;
     const clientFCMRegistrationTokenTable = process.env.CLIENT_FCM_REGISTRATION_TOKEN_TABLE;
 
-    const pushBlissRequestNotification = async (registrationToken, blissRequestId) => {
+    const pushBlissRequestNotification = async (clientFCMToken, blissRequestId, clientName) => {
+        const messageHandledOnClient = {
+            MESSAGE: `${clientName} has sent you a bliss Request!`,
+            BLISS_REQUEST_ID: blissRequestId
+        };
+
         const message = {
             notification: {
                 title: 'Bliss Request Received',
-                body: `You've Received A New Bliss Request!`
+                body: `${clientName} has sent you a bliss request!`
             },
             android: {
                 notification: {
                     color: `#9c27b0`
                 }
             },
-            data: {
-                BLISS_REQUEST_ID: blissRequestId
-            },
-            token: registrationToken
+            data: messageHandledOnClient,
+            token: clientFCMToken
         };
 
-        const messageId = await firebaseAdminClient.messaging().send(message);
-        return messageId;
+        await firebaseAdminClient.messaging().send(message);
+        return messageHandledOnClient;
     };
 
-    const pushBlissResponseNotification = async (registrationToken, blissRequestId) => {
+    const pushBlissResponseNotification = async (clientFCMToken, celebName, blissRequestDate, blissRequestTime) => {
+        const messageHandledOnClient = {
+            MESSAGE: `${celebName} has created a bliss for you. You requested for bliss on ${blissRequestDate} at ${blissRequestTime}`,
+            BLISS_RESPONSE_ID: blissResponseId
+        };
+
         const message = {
             notification: {
                 title: 'Bliss Response Received',
@@ -42,25 +50,46 @@ module.exports = (postgresClient, firebaseAdminClient, dynamoDBClient) => {
                     color: `#9c27b0`
                 }
             },
-            data: {
-                BLISS_REQUEST_ID: blissRequestId
-            },
-            token: registrationToken
+            data: messageHandledOnClient,
+            token: clientFCMToken
         };
 
-        const messageId = await firebaseAdminClient.messaging().send(message);
-        return messageId;
+        await firebaseAdminClient.messaging().send(message);
+        return messageHandledOnClient;
     };
 
-    const getCelebFCMRegistrationToken = async (celebName) => {
+    const pushBlissCancelNotification = async (clientFCMToken, celebName, blissRequestDate, blissRequestTime) => {
+        const messageHandledOnClient = {
+            MESSAGE: `${celebName} has declined your bliss request. You requested for bliss on ${blissRequestDate} at ${blissRequestTime}`,
+        };
+
+        const message = {
+            notification: {
+                title: 'Bliss Request Denied',
+                body: `Your Bliss Request from ${celebName} is canceled!`
+            },
+            android: {
+                notification: {
+                    color: `#9c27b0`
+                }
+            },
+            data: messageHandledOnClient,
+            token: clientFCMToken
+        };
+
+        await firebaseAdminClient.messaging().send(message);
+        return messageHandledOnClient;
+    };
+
+    const getCelebFCMRegistrationToken = (celebName) => {
         return new Promise((resolve, reject) => {
             try {
-                var celebToken = {
+                const celebToken = {
                     TableName: celebFCMRegistrationTokenTable,
                     Key: {
                         'CELEB_NAME': { S: celebName }
                     },
-                    ProjectionExpression: 'FCM_TOKEN'
+                    ProjectionExpression: 'CELEB_FCM_TOKEN'
                 };
 
                 dynamoDBClient.getItem(celebToken, function(err, token) {
@@ -77,15 +106,15 @@ module.exports = (postgresClient, firebaseAdminClient, dynamoDBClient) => {
         });
     };
 
-    const getClientFCMRegistrationToken = async (clientId) => {
+    const getClientFCMRegistrationToken = (clientId) => {
         return new Promise((resolve, reject) => {
             try {
-                var clientToken = {
+                const clientToken = {
                     TableName: clientFCMRegistrationTokenTable,
                     Key: {
                         'CLIENT_ID': { S: clientId }
                     },
-                    ProjectionExpression: 'FCM_TOKEN'
+                    ProjectionExpression: 'CLIENT_FCM_TOKEN'
                 };
 
                 dynamoDBClient.getItem(clientToken, function(err, token) {
@@ -113,7 +142,7 @@ module.exports = (postgresClient, firebaseAdminClient, dynamoDBClient) => {
         subscribersDatabaseResponse.forEach(subscriber => subscribers.push(subscriber['dataValues']));
 
         return subscribers;
-    }
+    };
 
     const pushPodcastEpisodeUpdateNotification = async (podcastTitle, episodeNumber, episodeTitle) => {
         const subscribers = getPodcastSubscribers(podcastTitle);
@@ -135,6 +164,7 @@ module.exports = (postgresClient, firebaseAdminClient, dynamoDBClient) => {
                 }
             },
             data: {
+                MESSAGE: `A new episode '${episodeTitle}' has been uploaded in the podcast ${podcastTitle}!`,
                 PODCAST_TITLE: podcastTitle,
                 EPISODE_NUMBER: episodeNumber,
                 EPISODE_TITLE: episodeTitle
@@ -143,10 +173,11 @@ module.exports = (postgresClient, firebaseAdminClient, dynamoDBClient) => {
         };
 
         await firebaseAdminClient.messaging().send(message);
-    }
+    };
 
     return {
         pushBlissRequestNotification,
+        pushBlissCancelNotification,
         getCelebFCMRegistrationToken,
         getClientFCMRegistrationToken,
         pushBlissResponseNotification,

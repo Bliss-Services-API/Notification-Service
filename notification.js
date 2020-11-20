@@ -4,8 +4,8 @@ require('dotenv').config();
 
 const express = require('express');
 const bodyParser = require('body-parser');
-const subscribeSNSTopics = require('./subscribeSNSTopics');
-const unsubscribeSNSTopics = require('./unsubscribeSNSTopic');
+const subscribeSNSTopics = require('./subscribeSnsTopics');
+const unsubscribeSNSTopics = require('./unsubscribeSnsTopic');
 const notificationRoutes = require('./routes/routes');
 const AWS = require('aws-sdk');
 const chalk = require('./chalk.console');
@@ -46,7 +46,7 @@ postgresClient.authenticate()
     .then(() => console.log(chalk.success(`Postgres Connection Established Successfully`)))
     .then(() => app.use('/notification', notificationRoutes(postgresClient, firebaseAdminClient, dynamoDBClient, S3Client)))
     .then(() => console.log(chalk.success(`Routes Established Successfully`)))
-    .then(() => subscribeSNSTopics(AWS))
+    .then(async () => await subscribeSNSTopics(AWS))
     .catch((err) => console.error(chalk.error(`ERR: ${err.message}`)));
 
 process.on('exit', () => unsubscribeSNSTopics(AWS));
